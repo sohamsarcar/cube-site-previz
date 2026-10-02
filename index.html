@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cube site previz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --bg: #D9DAD4; --ink: #17202B; --muted: #5E6670; --line: rgba(23,32,43,.16);
+    --accent: #2340E8; --accent-ink: #fff; --warn: #FF6A1A;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#1A1E23; --ink:#ECEDE8; --muted:#9AA1A9; --line:rgba(236,237,232,.14); --accent:#6F84FF; --accent-ink:#0E1220; }
+  }
+  :root[data-theme="dark"] { --bg:#1A1E23; --ink:#ECEDE8; --muted:#9AA1A9; --line:rgba(236,237,232,.14); --accent:#6F84FF; --accent-ink:#0E1220; }
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: inherit; }
+  body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:"Archivo","Helvetica Neue",Arial,sans-serif; }
+
+  /* Landing */
+  .landing { height:100%; display:flex; flex-direction:column; justify-content:space-between; padding:24px 22px 28px; max-width:560px; margin:0 auto; }
+  .title { font-stretch:125%; font-weight:800; font-size:clamp(2.6rem,12vw,4.4rem); line-height:.88; letter-spacing:-.02em; margin:0; }
+  .spec { margin:18px 0 0; display:grid; grid-template-columns:auto 1fr; gap:6px 18px; font-size:.95rem; }
+  .spec dt { color:var(--muted); }
+  .spec dd { margin:0; font-weight:600; }
+  .how { color:var(--muted); font-size:.92rem; line-height:1.45; max-width:40ch; }
+  .go { width:100%; border:0; border-radius:16px; padding:20px; background:var(--accent); color:var(--accent-ink);
+        font:800 1.15rem "Archivo",sans-serif; font-stretch:115%; cursor:pointer; }
+  .go:disabled { opacity:.45; cursor:default; }
+  .msg { margin:12px 0 0; font-size:.88rem; line-height:1.4; color:var(--ink); min-height:1.2em; }
+  button:focus-visible { outline:3px solid var(--ink); outline-offset:3px; }
+
+  /* AR overlay: always light-on-dark for outdoor legibility */
+  #overlay { position:fixed; inset:0; display:none; color:#fff; touch-action:none; user-select:none; -webkit-user-select:none;
+             padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  #overlay.on { display:block; }
+  .hud { position:absolute; top:calc(12px + env(safe-area-inset-top,0px)); left:12px; right:12px;
+         background:rgba(10,14,22,.62); backdrop-filter:blur(8px); border-radius:18px; padding:14px 16px; }
+  .big { font-stretch:125%; font-weight:800; font-size:clamp(2.4rem,13vw,3.6rem); line-height:.9; letter-spacing:-.02em; cursor:pointer; }
+  .big small { font-size:.4em; font-weight:600; font-stretch:100%; margin-left:.25em; opacity:.8; }
+  .lbl { font-size:.85rem; opacity:.75; margin-top:4px; }
+  .stats { display:flex; gap:18px; margin-top:12px; flex-wrap:wrap; }
+  .stats div { font-size:.82rem; opacity:.75; }
+  .stats b { display:block; font-size:1.05rem; opacity:1; color:#fff; font-weight:700; }
+  .hint { margin-top:10px; font-size:.82rem; color:#FFD3BA; }
+  .hint:empty { display:none; }
+
+  .bar { position:absolute; left:12px; right:12px; bottom:calc(16px + env(safe-area-inset-bottom,0px));
+         display:grid; gap:10px; }
+  .step { display:flex; align-items:center; justify-content:space-between; gap:8px;
+          background:rgba(10,14,22,.62); backdrop-filter:blur(8px); border-radius:14px; padding:6px; }
+  .step span { font-size:.9rem; font-weight:600; }
+  .step button, .row button { border:0; border-radius:10px; background:rgba(255,255,255,.14); color:#fff;
+          font:700 1rem "Archivo",sans-serif; padding:12px 16px; cursor:pointer; }
+  .row { display:grid; grid-template-columns:1fr auto; gap:10px; }
+  .row .lock { background:#2340E8; padding:18px; font-size:1.1rem; font-stretch:112%; }
+  .row .lock.locked { background:#fff; color:#17202B; }
+  .drag { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(150px + env(safe-area-inset-bottom,0px));
+          font-size:.8rem; opacity:.7; white-space:nowrap; }
+</style>
+</head>
+<body>
+
+<main class="landing" id="landing">
+  <div>
+    <h1 class="title">Site<br>previz</h1>
+    <dl class="spec">
+      <dt>Volume</dt><dd>30 × 30 × 30 ft</dd>
+      <dt>Underside</dt><dd>10 ft above ground</dd>
+      <dt>Starts</dt><dd>50 ft in front of you</dd>
+    </dl>
+  </div>
+  <p class="how">The cube follows your view at a set distance. Frame it, tap Lock, then walk the site; the readout tracks your distance to the nearest face. Drag one finger sideways to rotate.</p>
+  <div>
+    <button class="go" id="go" type="button" disabled>Checking AR support…</button>
+    <p class="msg" id="msg"></p>
+  </div>
+</main>
+
+<div id="overlay">
+  <div class="hud">
+    <div class="big" id="dEdge" title="Tap to switch units">–</div>
+    <div class="lbl" id="dLbl">to nearest face</div>
+    <div class="stats">
+      <div><b id="dCen">–</b>to centre</div>
+      <div><b id="aTop">–</b>top above eye line</div>
+      <div><b id="rot">0°</b>rotation</div>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+  <div class="drag" id="dragHint">Drag sideways to rotate</div>
+  <div class="bar">
+    <div class="step" id="stepper">
+      <button type="button" id="minus" aria-label="Move cube 5 feet closer">−5</button>
+      <span id="follow">Front face at 50 ft</span>
+      <button type="button" id="plus" aria-label="Move cube 5 feet further">+5</button>
+    </div>
+    <div class="row">
+      <button type="button" class="lock" id="lock">Lock here</button>
+      <button type="button" id="exit">Exit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FT = 0.3048, S = 30*FT, H = S/2, LIFT = 10*FT;
+let followDist = 50*FT, metric = false;
+
+const $ = id => document.getElementById(id);
+const fmt = m => metric ? m.toFixed(1)+'<small>m</small>' : (m/FT).toFixed(1)+'<small>ft</small>';
+const fmtS = m => metric ? m.toFixed(1)+' m' : Math.round(m/FT)+' ft';
+
+// ---------- Scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+renderer.domElement.style.display = 'none';
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 1000);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(5,10,3); scene.add(sun);
+
+const group = new THREE.Group(); group.visible = false; scene.add(group);
+const glass = new THREE.MeshStandardMaterial({ color:0x2340E8, transparent:true, opacity:.32, roughness:.2, metalness:0, side:THREE.DoubleSide, depthWrite:false });
+const edgeMat = new THREE.MeshBasicMaterial({ color:0xffffff });
+const footMat = new THREE.MeshBasicMaterial({ color:0xFF6A1A });
+const dropMat = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.7 });
+function beam(x,y,z,sx,sy,sz,mat){ const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat); m.position.set(x,y,z); group.add(m); }
+
+const box = new THREE.Mesh(new THREE.BoxGeometry(S,S,S), glass); box.position.y = LIFT+H; box.renderOrder = 2; group.add(box);
+const t = 0.12; // edge beams, readable at 50 ft
+for (const y of [LIFT, LIFT+S]) for (const z of [-H,H]) beam(0,y,z, S+t,t,t, edgeMat);
+for (const y of [LIFT, LIFT+S]) for (const x of [-H,H]) beam(x,y,0, t,t,S+t, edgeMat);
+for (const x of [-H,H]) for (const z of [-H,H]) beam(x,LIFT+H,z, t,S,t, edgeMat);
+for (const z of [-H,H]) beam(0,0.01,z, S,0.02,0.08, footMat);   // footprint on ground
+for (const x of [-H,H]) beam(x,0.01,0, 0.08,0.02,S, footMat);
+for (const x of [-H,H]) for (const z of [-H,H]) beam(x,LIFT/2,z, 0.04,LIFT,0.04, dropMat); // corner drop lines
+
+// ---------- State ----------
+let hitSource = null, groundY = -1.4, groundKnown = false;
+let locked = false, pendingLock = false, anchor = null;
+const followPos = new THREE.Vector3(); let followYaw = 0, followInit = false;
+const lockPos = new THREE.Vector3(); let lockYaw = 0, rotOffset = 0;
+const camPos = new THREE.Vector3(), camQuat = new THREE.Quaternion();
+let lastHud = 0, trackingLost = false;
+
+function angLerp(a,b,k){ let d=((b-a+Math.PI)%(2*Math.PI))-Math.PI; if(d<-Math.PI) d+=2*Math.PI; return a+d*k; }
+
+// ---------- Support check ----------
+(async () => {
+  const go=$('go'), msg=$('msg');
+  if (!navigator.xr) { go.textContent='AR not available'; msg.textContent='Open this page directly in Chrome on an ARCore Android phone (not inside another app).'; return; }
+  let ok=false; try { ok = await navigator.xr.isSessionSupported('immersive-ar'); } catch(e){}
+  if (!ok) { go.textContent='AR not available'; msg.textContent='This browser can\'t start camera AR. Use Chrome on Android, opened from the page\'s own URL, not an embedded view.'; return; }
+  go.disabled=false; go.textContent='Open camera';
+})();
+
+// ---------- Session ----------
+$('go').addEventListener('click', async () => {
+  try {
+    const session = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures:['hit-test'], optionalFeatures:['dom-overlay','anchors','local-floor'],
+      domOverlay:{ root:$('overlay') }
+    });
+    let type='local';
+    try { await session.requestReferenceSpace('local-floor'); type='local-floor'; } catch(e){}
+    if (type==='local-floor') { groundY=0; }
+    renderer.xr.setReferenceSpaceType(type);
+    await renderer.xr.setSession(session);
+    const viewer = await session.requestReferenceSpace('viewer');
+    hitSource = await session.requestHitTestSource({ space:viewer });
+    session.addEventListener('end', onEnd);
+    $('landing').style.display='none'; $('overlay').classList.add('on');
+    renderer.domElement.style.display='block'; group.visible=true;
+  } catch(e) {
+    $('msg').textContent = 'Couldn\'t start AR: ' + (e.message || e) + '. Check camera permission for Chrome.';
+  }
+});
+
+function onEnd(){
+  hitSource=null; anchor=null; locked=false; pendingLock=false; followInit=false; groundKnown=false; groundY=-1.4;
+  $('overlay').classList.remove('on'); $('landing').style.display='';
+  renderer.domElement.style.display='none'; group.visible=false; setLockUI();
+}
+$('exit').addEventListener('click', () => renderer.xr.getSession()?.end());
+
+// ---------- Controls ----------
+const overlay=$('overlay');
+overlay.addEventListener('beforexrselect', e => e.preventDefault());
+function setLockUI(){
+  $('lock').textContent = locked ? 'Unlock' : 'Lock here';
+  $('lock').classList.toggle('locked', locked);
+  $('stepper').style.visibility = locked ? 'hidden' : 'visible';
+}
+$('lock').addEventListener('click', () => {
+  if (locked) { if (anchor) { try{anchor.delete();}catch(e){} anchor=null; } locked=false; followInit=false; setLockUI(); }
+  else pendingLock = true;
+});
+function setFollow(d){ followDist=Math.max(10*FT, Math.min(300*FT, d)); $('follow').textContent='Front face at '+fmtS(followDist); }
+$('minus').addEventListener('click', () => setFollow(followDist-5*FT));
+$('plus').addEventListener('click', () => setFollow(followDist+5*FT));
+$('dEdge').addEventListener('click', () => { metric=!metric; setFollow(followDist); });
+
+let dragX=null;
+overlay.addEventListener('pointerdown', e => { if (e.target.closest('button,.big')) return; dragX=e.clientX; $('dragHint').style.display='none'; });
+overlay.addEventListener('pointermove', e => { if (dragX===null) return; rotOffset += (e.clientX-dragX)*0.006; dragX=e.clientX; });
+['pointerup','pointercancel','pointerleave'].forEach(ev => overlay.addEventListener(ev, () => dragX=null));
+
+// ---------- Frame loop ----------
+renderer.setAnimationLoop((time, frame) => {
+  if (!frame) { renderer.render(scene,camera); return; }
+  const ref = renderer.xr.getReferenceSpace();
+  const pose = frame.getViewerPose(ref);
+  if (!pose) { renderer.render(scene,camera); return; }
+  const p=pose.transform.position, o=pose.transform.orientation;
+  camPos.set(p.x,p.y,p.z); camQuat.set(o.x,o.y,o.z,o.w);
+  trackingLost = !!pose.emulatedPosition;
+
+  // Ground calibration from hit-tests below eye level
+  if (hitSource) {
+    const hits = frame.getHitTestResults(hitSource);
+    if (hits.length) {
+      const hp = hits[0].getPose(ref);
+      if (hp) {
+        const y = hp.transform.position.y;
+        if (!groundKnown && y < p.y-0.8) { groundY=y; groundKnown=true; }
+        else if (groundKnown && Math.abs(y-groundY) < 0.4) groundY += (y-groundY)*0.03;
+      }
+    }
+  }
+
+  // Follow target
+  const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(camQuat); fwd.y=0;
+  if (fwd.lengthSq() > 1e-4) {
+    fwd.normalize();
+    const target = camPos.clone().addScaledVector(fwd, followDist+H);
+    const yaw = Math.atan2(fwd.x, fwd.z);
+    if (!followInit) { followPos.copy(target); followYaw=yaw; followInit=true; }
+    else if (!locked) { followPos.lerp(target, 0.1); followYaw = angLerp(followYaw, yaw, 0.1); }
+  }
+
+  if (pendingLock) {
+    pendingLock=false; locked=true; lockPos.copy(followPos); lockYaw=followYaw; setLockUI();
+    if (frame.createAnchor) {
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0,lockYaw,0));
+      frame.createAnchor(new XRRigidTransform({x:lockPos.x,y:groundY,z:lockPos.z},{x:q.x,y:q.y,z:q.z,w:q.w}), ref)
+        .then(a => { if (locked) anchor=a; else a.delete(); }).catch(()=>{});
+    }
+  }
+
+  // Place the group
+  if (locked && anchor) {
+    const ap = frame.getPose(anchor.anchorSpace, ref);
+    if (ap) { const a=ap.transform; group.position.set(a.position.x,a.position.y,a.position.z);
+      group.quaternion.set(a.orientation.x,a.orientation.y,a.orientation.z,a.orientation.w); group.rotateY(rotOffset); }
+  } else if (locked) {
+    group.position.set(lockPos.x, groundY, lockPos.z); group.rotation.set(0, lockYaw+rotOffset, 0);
+  } else {
+    group.position.set(followPos.x, groundY, followPos.z); group.rotation.set(0, followYaw+rotOffset, 0);
+  }
+  group.updateMatrixWorld();
+
+  // Distances
+  if (time - lastHud > 120) {
+    lastHud = time;
+    const l = group.worldToLocal(camPos.clone());
+    const ex = Math.max(Math.abs(l.x)-H, 0), ez = Math.max(Math.abs(l.z)-H, 0);
+    const dEdge = Math.hypot(ex, ez), dCen = Math.hypot(l.x, l.z);
+    const inside = ex===0 && ez===0;
+    const eye = camPos.y - group.position.y;
+    const topAng = Math.atan2(LIFT+S-eye, Math.max(dEdge, 0.01)) * 180/Math.PI;
+    $('dEdge').innerHTML = inside ? 'Under it' : fmt(dEdge);
+    $('dLbl').textContent = inside ? 'you\'re inside the footprint' : 'to nearest face';
+    $('dCen').textContent = fmtS(dCen);
+    $('aTop').textContent = inside ? '—' : Math.round(topAng)+'°';
+    let deg = Math.round(((rotOffset*180/Math.PI)%360+360)%360); $('rot').textContent = deg+'°';
+    $('hint').textContent = trackingLost ? 'Tracking lost. Move slowly and point at textured ground.'
+      : !groundKnown ? 'Point at the ground for a moment to measure its height.'
+      : (locked && !anchor && frame.createAnchor) ? 'Anchoring…' : '';
+  }
+
+  renderer.render(scene, camera);
+});
+
+window.addEventListener('resize', () => {
+  if (renderer.xr.isPresenting) return;
+  camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
