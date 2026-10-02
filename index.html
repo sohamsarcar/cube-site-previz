@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Cube site previz</title>
+<title>Weverse Setup Previz</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
@@ -75,17 +75,18 @@
 
 <main class="landing" id="landing">
   <div>
-    <h1 class="title">Site<br>previz</h1>
+    <h1 class="title">Weverse<br>setup<br>previz</h1>
     <dl class="spec">
       <dt>Volume</dt><dd>30 × 30 × 30 ft</dd>
       <dt>Riser</dt><dd>Solid, 10 ft high</dd>
       <dt>DJ</dt><dd>Console 4 ft from the front corner</dd>
+      <dt>Floor marker</dt><dd>40 × 40 ft, red</dd>
       <dt>Starts</dt><dd>50 ft in front of you</dd>
-      <dt>Models</dt><dd>Glass volume · White box</dd>
-      <dt>Version</dt><dd>5</dd>
+      <dt>Models</dt><dd>Glass box · White box</dd>
+      <dt>Version</dt><dd>7</dd>
     </dl>
   </div>
-  <p class="how">The cube follows your view at a set distance. Frame it, tap Lock, then walk the site; the readout tracks your distance to the nearest face. Drag one finger sideways to rotate.</p>
+  <p class="how">A red 40 × 40 ft floor marker follows your view at a set distance. Line it up with the ground and tap Place here; the setup appears on it. Then walk the site; the readout tracks your distance to the nearest face. Drag one finger sideways to rotate.</p>
   <div>
     <button class="go" id="go" type="button" disabled>Checking AR support…</button>
     <p class="msg" id="msg"></p>
@@ -106,7 +107,7 @@
   <div class="drag" id="dragHint">Drag sideways to rotate</div>
   <div class="bar">
     <div class="models" role="group" aria-label="Model">
-      <button type="button" id="mGlass" aria-pressed="true">Glass volume</button>
+      <button type="button" id="mGlass" aria-pressed="true">Glass box</button>
       <button type="button" id="mBox" aria-pressed="false">White box</button>
     </div>
     <div class="step" id="stepper">
@@ -115,7 +116,7 @@
       <button type="button" id="plus" aria-label="Move cube 5 feet further">+5</button>
     </div>
     <div class="row">
-      <button type="button" class="lock" id="lock">Lock here</button>
+      <button type="button" class="lock" id="lock">Place here</button>
       <button type="button" id="exit">Exit</button>
     </div>
   </div>
@@ -143,13 +144,16 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.0));
 const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(5,10,3); scene.add(sun);
 
 const group = new THREE.Group(); group.visible = false; scene.add(group);
-const glass = new THREE.MeshStandardMaterial({ color:0x2340E8, transparent:true, opacity:.32, roughness:.2, metalness:0, side:THREE.DoubleSide, depthWrite:false });
+const glass = new THREE.MeshStandardMaterial({ color:0x2340E8, transparent:true, opacity:.9, roughness:.2, metalness:0, side:THREE.FrontSide, depthWrite:false }); // outer faces only: back faces showing through read as dark patches
 const edgeMat = new THREE.MeshBasicMaterial({ color:0xffffff });
 const footMat = new THREE.MeshBasicMaterial({ color:0xFF6A1A });
 function beam(x,y,z,sx,sy,sz,mat,parent=group){ const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat); m.position.set(x,y,z); parent.add(m); }
 
-// Model 1: glass volume with edge beams
-const wire = new THREE.Group(); group.add(wire);
+// Everything that appears once the floor marker is placed
+const setup = new THREE.Group(); setup.visible = false; group.add(setup);
+
+// Model 1: glass box with edge beams
+const wire = new THREE.Group(); setup.add(wire);
 const box = new THREE.Mesh(new THREE.BoxGeometry(S,S,S), glass); box.position.y = LIFT+H; box.renderOrder = 2; wire.add(box);
 const t = 0.12; // edge beams, readable at 50 ft
 for (const y of [LIFT, LIFT+S]) for (const z of [-H,H]) beam(0,y,z, S+t,t,t, edgeMat, wire);
@@ -157,7 +161,7 @@ for (const y of [LIFT, LIFT+S]) for (const x of [-H,H]) beam(x,y,0, t,t,S+t, edg
 for (const x of [-H,H]) for (const z of [-H,H]) beam(x,LIFT+H,z, t,S,t, edgeMat, wire);
 
 // Model 2: white box, open and recessed on the two faces that meet at the viewer-side corner (-Z and +X)
-const solid = new THREE.Group(); solid.visible = false; group.add(solid);
+const solid = new THREE.Group(); solid.visible = false; setup.add(solid);
 const white = new THREE.MeshStandardMaterial({ color:0xe2e2e2, emissive:0x1e1e1e, roughness:.95, metalness:0, side:THREE.DoubleSide });
 const F = S*0.06, D = S*0.30, CY = LIFT+H, IH = S-2*F; // frame width, recess depth, centre height, opening height
 function wall(w,h,x,y,z,ry=0,rx=0){ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),white); m.position.set(x,y,z); m.rotation.set(rx,ry,0); solid.add(m); }
@@ -175,13 +179,21 @@ wall((D-F)*Math.SQRT2,IH, H-(F+D)/2,CY,-H+(F+D)/2, Math.PI/4);                  
 for (const z of [-H,H]) beam(0,0.01,z, S,0.02,0.08, footMat);   // footprint on ground
 for (const x of [-H,H]) beam(x,0.01,0, 0.08,0.02,S, footMat);
 
+// Floor marker: red 40 x 40 ft square covering the cube plus the DJ platform, shown first so it can be lined up with the ground
+const M = 40*FT, MO = 5*FT;   // size, and offset toward the DJ corner (+X,-Z) so the platform sits inside it
+const markMat = new THREE.MeshBasicMaterial({ color:0xff2a2a, transparent:true, opacity:.34, side:THREE.DoubleSide, depthWrite:false });
+const mark = new THREE.Mesh(new THREE.PlaneGeometry(M,M), markMat); mark.rotation.x = -Math.PI/2; mark.position.set(MO,0.015,-MO); group.add(mark);
+const markEdge = new THREE.MeshBasicMaterial({ color:0xff2a2a });
+for (const z of [-M/2,M/2]) beam(MO,0.02,-MO+z, M,0.03,0.1, markEdge);
+for (const x of [-M/2,M/2]) beam(MO+x,0.02,-MO, 0.1,0.03,M, markEdge);
+
 // Riser: solid block under the cube, its own colour in each model
 const RISER = { glass:0xc9ced6, box:0xA59BD6 }; // light tones, so the black console and platform read against the riser
 const riserMat = new THREE.MeshStandardMaterial({ color:RISER.glass, emissive:0x1c1c1c, roughness:.9, metalness:0 });
-beam(0,(LIFT-0.02)/2,0, S-0.02,LIFT-0.02,S-0.02, riserMat);
+beam(0,(LIFT-0.02)/2,0, S-0.02,LIFT-0.02,S-0.02, riserMat, setup);
 
 // DJ set at the front corner (+X,-Z): 2 ft platform, console 4 ft out from the riser corner edge, DJ between the two
-const dj = new THREE.Group(); dj.position.set(H,0,-H); dj.rotation.y = 3*Math.PI/4; group.add(dj); // local +Z points out toward the audience
+const dj = new THREE.Group(); dj.position.set(H,0,-H); dj.rotation.y = 3*Math.PI/4; setup.add(dj); // local +Z points out toward the audience
 const blackMat = new THREE.MeshStandardMaterial({ color:0x14161a, roughness:.8 });
 const gearMat = new THREE.MeshStandardMaterial({ color:0x8a919c, roughness:.5 });
 const PLAT = 2*FT, GAP = 4*FT, CW = 6*FT, CH = 4*FT, CD = 2.5*FT;
@@ -251,7 +263,8 @@ $('exit').addEventListener('click', () => renderer.xr.getSession()?.end());
 const overlay=$('overlay');
 overlay.addEventListener('beforexrselect', e => e.preventDefault());
 function setLockUI(){
-  $('lock').textContent = locked ? 'Unlock' : 'Lock here';
+  $('lock').textContent = locked ? 'Reposition' : 'Place here';
+  setup.visible = locked;
   $('lock').classList.toggle('locked', locked);
   $('stepper').style.visibility = locked ? 'hidden' : 'visible';
 }
@@ -347,7 +360,8 @@ renderer.setAnimationLoop((time, frame) => {
     let deg = Math.round(((rotOffset*180/Math.PI)%360+360)%360); $('rot').textContent = deg+'°';
     $('hint').textContent = trackingLost ? 'Tracking lost. Move slowly and point at textured ground.'
       : !groundKnown ? 'Point at the ground for a moment to measure its height.'
-      : (locked && !anchor && frame.createAnchor) ? 'Anchoring…' : '';
+      : (locked && !anchor && frame.createAnchor) ? 'Anchoring…'
+      : !locked ? 'Line the red marker up with the floor, then tap Place here.' : '';
   }
 
   renderer.render(scene, camera);
