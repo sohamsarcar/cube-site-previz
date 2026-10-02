@@ -82,6 +82,7 @@
       <dt>DJ</dt><dd>Console 4 ft from the front corner</dd>
       <dt>Starts</dt><dd>50 ft in front of you</dd>
       <dt>Models</dt><dd>Glass volume · White box</dd>
+      <dt>Version</dt><dd>5</dd>
     </dl>
   </div>
   <p class="how">The cube follows your view at a set distance. Frame it, tap Lock, then walk the site; the readout tracks your distance to the nearest face. Drag one finger sideways to rotate.</p>
@@ -175,8 +176,8 @@ for (const z of [-H,H]) beam(0,0.01,z, S,0.02,0.08, footMat);   // footprint on 
 for (const x of [-H,H]) beam(x,0.01,0, 0.08,0.02,S, footMat);
 
 // Riser: solid block under the cube, its own colour in each model
-const RISER = { glass:0x9aa3b2, box:0xA59BD6 }; // mid tones, so the black console and platform read against the riser
-const riserMat = new THREE.MeshStandardMaterial({ color:RISER.glass, roughness:.9, metalness:0 });
+const RISER = { glass:0xc9ced6, box:0xA59BD6 }; // light tones, so the black console and platform read against the riser
+const riserMat = new THREE.MeshStandardMaterial({ color:RISER.glass, emissive:0x1c1c1c, roughness:.9, metalness:0 });
 beam(0,(LIFT-0.02)/2,0, S-0.02,LIFT-0.02,S-0.02, riserMat);
 
 // DJ set at the front corner (+X,-Z): 2 ft platform, console 4 ft out from the riser corner edge, DJ between the two
