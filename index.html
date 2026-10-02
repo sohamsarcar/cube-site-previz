@@ -62,7 +62,12 @@
   .row { display:grid; grid-template-columns:1fr auto; gap:10px; }
   .row .lock { background:#2340E8; padding:18px; font-size:1.1rem; font-stretch:112%; }
   .row .lock.locked { background:#fff; color:#17202B; }
-  .drag { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(150px + env(safe-area-inset-bottom,0px));
+  .models { display:grid; grid-template-columns:1fr 1fr; gap:6px;
+            background:rgba(10,14,22,.62); backdrop-filter:blur(8px); border-radius:14px; padding:6px; }
+  .models button { border:0; border-radius:10px; background:transparent; color:#fff; opacity:.7;
+            font:700 .95rem "Archivo",sans-serif; padding:12px 10px; cursor:pointer; }
+  .models button[aria-pressed="true"] { background:rgba(255,255,255,.9); color:#17202B; opacity:1; }
+  .drag { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(212px + env(safe-area-inset-bottom,0px));
           font-size:.8rem; opacity:.7; white-space:nowrap; }
 </style>
 </head>
@@ -75,6 +80,7 @@
       <dt>Volume</dt><dd>30 × 30 × 30 ft</dd>
       <dt>Underside</dt><dd>10 ft above ground</dd>
       <dt>Starts</dt><dd>50 ft in front of you</dd>
+      <dt>Models</dt><dd>Glass volume · White box</dd>
     </dl>
   </div>
   <p class="how">The cube follows your view at a set distance. Frame it, tap Lock, then walk the site; the readout tracks your distance to the nearest face. Drag one finger sideways to rotate.</p>
@@ -97,6 +103,10 @@
   </div>
   <div class="drag" id="dragHint">Drag sideways to rotate</div>
   <div class="bar">
+    <div class="models" role="group" aria-label="Model">
+      <button type="button" id="mGlass" aria-pressed="true">Glass volume</button>
+      <button type="button" id="mBox" aria-pressed="false">White box</button>
+    </div>
     <div class="step" id="stepper">
       <button type="button" id="minus" aria-label="Move cube 5 feet closer">−5</button>
       <span id="follow">Front face at 50 ft</span>
@@ -135,13 +145,32 @@ const glass = new THREE.MeshStandardMaterial({ color:0x2340E8, transparent:true,
 const edgeMat = new THREE.MeshBasicMaterial({ color:0xffffff });
 const footMat = new THREE.MeshBasicMaterial({ color:0xFF6A1A });
 const dropMat = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.7 });
-function beam(x,y,z,sx,sy,sz,mat){ const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat); m.position.set(x,y,z); group.add(m); }
+function beam(x,y,z,sx,sy,sz,mat,parent=group){ const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat); m.position.set(x,y,z); parent.add(m); }
 
-const box = new THREE.Mesh(new THREE.BoxGeometry(S,S,S), glass); box.position.y = LIFT+H; box.renderOrder = 2; group.add(box);
+// Model 1: glass volume with edge beams
+const wire = new THREE.Group(); group.add(wire);
+const box = new THREE.Mesh(new THREE.BoxGeometry(S,S,S), glass); box.position.y = LIFT+H; box.renderOrder = 2; wire.add(box);
 const t = 0.12; // edge beams, readable at 50 ft
-for (const y of [LIFT, LIFT+S]) for (const z of [-H,H]) beam(0,y,z, S+t,t,t, edgeMat);
-for (const y of [LIFT, LIFT+S]) for (const x of [-H,H]) beam(x,y,0, t,t,S+t, edgeMat);
-for (const x of [-H,H]) for (const z of [-H,H]) beam(x,LIFT+H,z, t,S,t, edgeMat);
+for (const y of [LIFT, LIFT+S]) for (const z of [-H,H]) beam(0,y,z, S+t,t,t, edgeMat, wire);
+for (const y of [LIFT, LIFT+S]) for (const x of [-H,H]) beam(x,y,0, t,t,S+t, edgeMat, wire);
+for (const x of [-H,H]) for (const z of [-H,H]) beam(x,LIFT+H,z, t,S,t, edgeMat, wire);
+
+// Model 2: white box, open and recessed on the two faces that meet at the viewer-side corner (-Z and +X)
+const solid = new THREE.Group(); solid.visible = false; group.add(solid);
+const white = new THREE.MeshStandardMaterial({ color:0xe2e2e2, emissive:0x1e1e1e, roughness:.95, metalness:0, side:THREE.DoubleSide });
+const F = S*0.06, D = S*0.30, CY = LIFT+H, IH = S-2*F; // frame width, recess depth, centre height, opening height
+function wall(w,h,x,y,z,ry=0,rx=0){ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),white); m.position.set(x,y,z); m.rotation.set(rx,ry,0); solid.add(m); }
+wall(S,S, 0,LIFT+S,0, 0,Math.PI/2);  wall(S,S, 0,LIFT,0, 0,Math.PI/2);        // outer top, underside
+wall(S,S, 0,CY,H);                   wall(S,S, -H,CY,0, Math.PI/2);          // closed back faces (+Z, -X)
+wall(S,S, 0,LIFT+S-F,0, 0,Math.PI/2); wall(S,S, 0,LIFT+F,0, 0,Math.PI/2);    // recess ceiling, floor
+for (const y of [LIFT+F/2, LIFT+S-F/2]) { wall(S,F, 0,y,-H); wall(S,F, H,y,0, Math.PI/2); }   // frame top + bottom strips
+wall(F,IH, -H+F/2,CY,-H); wall(F,IH, H-F/2,CY,-H);                             // frame sides, -Z face
+wall(F,IH, H,CY,-H+F/2, Math.PI/2); wall(F,IH, H,CY,H-F/2, Math.PI/2);         // frame sides, +X face
+wall(S-D-F,IH, (F-D)/2,CY,-H+D);          wall(S-D-F,IH, H-D,CY,(D-F)/2, Math.PI/2); // recess back walls
+wall(D,IH, -H+F,CY,-H+D/2, Math.PI/2);    wall(D,IH, H-D/2,CY,H-F);                  // recess outer side walls
+wall(F,IH, H-F,CY,-H+F/2, Math.PI/2);     wall(F,IH, H-F/2,CY,-H+F);                 // inner sides of the corner post
+wall((D-F)*Math.SQRT2,IH, H-(F+D)/2,CY,-H+(F+D)/2, Math.PI/4);                       // divider between the two recesses, edge-on from the corner
+
 for (const z of [-H,H]) beam(0,0.01,z, S,0.02,0.08, footMat);   // footprint on ground
 for (const x of [-H,H]) beam(x,0.01,0, 0.08,0.02,S, footMat);
 for (const x of [-H,H]) for (const z of [-H,H]) beam(x,LIFT/2,z, 0.04,LIFT,0.04, dropMat); // corner drop lines
@@ -210,6 +239,14 @@ function setFollow(d){ followDist=Math.max(10*FT, Math.min(300*FT, d)); $('follo
 $('minus').addEventListener('click', () => setFollow(followDist-5*FT));
 $('plus').addEventListener('click', () => setFollow(followDist+5*FT));
 $('dEdge').addEventListener('click', () => { metric=!metric; setFollow(followDist); });
+
+function setModel(boxModel){
+  wire.visible = !boxModel; solid.visible = boxModel;
+  $('mGlass').setAttribute('aria-pressed', String(!boxModel)); $('mBox').setAttribute('aria-pressed', String(boxModel));
+  if (boxModel && rotOffset === 0) rotOffset = Math.PI/4;   // turn the open corner toward the viewer
+}
+$('mGlass').addEventListener('click', () => setModel(false));
+$('mBox').addEventListener('click', () => setModel(true));
 
 let dragX=null;
 overlay.addEventListener('pointerdown', e => { if (e.target.closest('button,.big')) return; dragX=e.clientX; $('dragHint').style.display='none'; });
