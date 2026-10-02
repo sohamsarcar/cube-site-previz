@@ -78,7 +78,8 @@
     <h1 class="title">Site<br>previz</h1>
     <dl class="spec">
       <dt>Volume</dt><dd>30 × 30 × 30 ft</dd>
-      <dt>Underside</dt><dd>10 ft above ground</dd>
+      <dt>Riser</dt><dd>Solid, 10 ft high</dd>
+      <dt>DJ</dt><dd>Console 4 ft from the front corner</dd>
       <dt>Starts</dt><dd>50 ft in front of you</dd>
       <dt>Models</dt><dd>Glass volume · White box</dd>
     </dl>
@@ -144,7 +145,6 @@ const group = new THREE.Group(); group.visible = false; scene.add(group);
 const glass = new THREE.MeshStandardMaterial({ color:0x2340E8, transparent:true, opacity:.32, roughness:.2, metalness:0, side:THREE.DoubleSide, depthWrite:false });
 const edgeMat = new THREE.MeshBasicMaterial({ color:0xffffff });
 const footMat = new THREE.MeshBasicMaterial({ color:0xFF6A1A });
-const dropMat = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.7 });
 function beam(x,y,z,sx,sy,sz,mat,parent=group){ const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat); m.position.set(x,y,z); parent.add(m); }
 
 // Model 1: glass volume with edge beams
@@ -173,13 +173,36 @@ wall((D-F)*Math.SQRT2,IH, H-(F+D)/2,CY,-H+(F+D)/2, Math.PI/4);                  
 
 for (const z of [-H,H]) beam(0,0.01,z, S,0.02,0.08, footMat);   // footprint on ground
 for (const x of [-H,H]) beam(x,0.01,0, 0.08,0.02,S, footMat);
-for (const x of [-H,H]) for (const z of [-H,H]) beam(x,LIFT/2,z, 0.04,LIFT,0.04, dropMat); // corner drop lines
+
+// Riser: solid block under the cube, its own colour in each model
+const RISER = { glass:0x1b1e24, box:0x32305C };
+const riserMat = new THREE.MeshStandardMaterial({ color:RISER.glass, roughness:.9, metalness:0 });
+beam(0,(LIFT-0.02)/2,0, S-0.02,LIFT-0.02,S-0.02, riserMat);
+
+// DJ set at the front corner (+X,-Z): 2 ft platform, console 4 ft out from the riser corner edge, DJ between the two
+const dj = new THREE.Group(); dj.position.set(H,0,-H); dj.rotation.y = 3*Math.PI/4; group.add(dj); // local +Z points out toward the audience
+const blackMat = new THREE.MeshStandardMaterial({ color:0x14161a, roughness:.8 });
+const gearMat = new THREE.MeshStandardMaterial({ color:0x8a919c, roughness:.5 });
+const PLAT = 2*FT, GAP = 4*FT, CW = 6*FT, CH = 4*FT, CD = 2.5*FT;
+beam(0,PLAT/2,4*FT, 12*FT,PLAT,8*FT, blackMat, dj);                 // platform 12 x 8 ft, 2 ft high
+beam(0,PLAT+CH/2,GAP+CD/2, CW,CH,CD, blackMat, dj);                 // console 6 ft wide, 4 ft tall
+beam(0,PLAT+CH+0.04,GAP+CD/2, CW*0.8,0.08,CD*0.7, gearMat, dj);    // decks on top
+
+const skin = new THREE.MeshStandardMaterial({ color:0xd9a273, roughness:.8 });
+const shirt = new THREE.MeshStandardMaterial({ color:0xf2f2f2, roughness:.9 });
+const pants = new THREE.MeshStandardMaterial({ color:0x39414f, roughness:.9 });
+const man = new THREE.Group(); man.position.set(0,PLAT,GAP/2); dj.add(man);   // 5 ft 8 in figure, facing the audience
+function part(geo,mat,x,y,z,rx=0){ const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.rotation.x=rx; man.add(m); }
+for (const x of [-0.1,0.1]) part(new THREE.CylinderGeometry(0.085,0.075,0.86,12), pants, x,0.43,0);          // legs
+part(new THREE.BoxGeometry(0.44,0.6,0.24), shirt, 0,1.16,0);                                                 // torso
+part(new THREE.SphereGeometry(0.115,16,12), skin, 0,1.62,0);                                                 // head
+for (const x of [-0.27,0.27]) part(new THREE.CylinderGeometry(0.05,0.045,0.6,10), skin, x,1.30,0.29, 1.83);  // arms reaching to the decks
 
 // ---------- State ----------
 let hitSource = null, groundY = -1.4, groundKnown = false;
 let locked = false, pendingLock = false, anchor = null;
 const followPos = new THREE.Vector3(); let followYaw = 0, followInit = false;
-const lockPos = new THREE.Vector3(); let lockYaw = 0, rotOffset = 0;
+const lockPos = new THREE.Vector3(); let lockYaw = 0, rotOffset = Math.PI/4; // start corner-on: the DJ corner faces the viewer
 const camPos = new THREE.Vector3(), camQuat = new THREE.Quaternion();
 let lastHud = 0, trackingLost = false;
 
@@ -243,7 +266,7 @@ $('dEdge').addEventListener('click', () => { metric=!metric; setFollow(followDis
 function setModel(boxModel){
   wire.visible = !boxModel; solid.visible = boxModel;
   $('mGlass').setAttribute('aria-pressed', String(!boxModel)); $('mBox').setAttribute('aria-pressed', String(boxModel));
-  if (boxModel && rotOffset === 0) rotOffset = Math.PI/4;   // turn the open corner toward the viewer
+  riserMat.color.setHex(boxModel ? RISER.box : RISER.glass);
 }
 $('mGlass').addEventListener('click', () => setModel(false));
 $('mBox').addEventListener('click', () => setModel(true));
