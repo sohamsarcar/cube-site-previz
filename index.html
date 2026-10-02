@@ -77,13 +77,13 @@
   <div>
     <h1 class="title">Weverse<br>setup<br>previz</h1>
     <dl class="spec">
-      <dt>Volume</dt><dd>30 × 30 × 30 ft</dd>
+      <dt>Screens</dt><dd>Two faces in a V, 30 × 30 ft each</dd>
       <dt>Riser</dt><dd>Solid, 10 ft high</dd>
       <dt>DJ</dt><dd>Console 4 ft from the front corner</dd>
       <dt>Floor marker</dt><dd>40 × 40 ft, red</dd>
       <dt>Starts</dt><dd>50 ft in front of you</dd>
       <dt>Models</dt><dd>Glass box · White box</dd>
-      <dt>Version</dt><dd>7</dd>
+      <dt>Version</dt><dd>8</dd>
     </dl>
   </div>
   <p class="how">A red 40 × 40 ft floor marker follows your view at a set distance. Line it up with the ground and tap Place here; the setup appears on it. Then walk the site; the readout tracks your distance to the nearest face. Drag one finger sideways to rotate.</p>
@@ -152,32 +152,37 @@ function beam(x,y,z,sx,sy,sz,mat,parent=group){ const m=new THREE.Mesh(new THREE
 // Everything that appears once the floor marker is placed
 const setup = new THREE.Group(); setup.visible = false; group.add(setup);
 
-// Model 1: glass box with edge beams
+// Model 1: two glass screen panels in a V (the -Z and +X faces), with edge beams. No back faces, no top.
 const wire = new THREE.Group(); setup.add(wire);
-const box = new THREE.Mesh(new THREE.BoxGeometry(S,S,S), glass); box.position.y = LIFT+H; box.renderOrder = 2; wire.add(box);
+const PT = 1*FT; // panel thickness
+for (const [sx,sz,x,z] of [[S,PT,0,-H+PT/2],[PT,S,H-PT/2,0]]) {
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(sx,S,sz), glass); panel.position.set(x,LIFT+H,z); panel.renderOrder = 2; wire.add(panel);
+}
 const t = 0.12; // edge beams, readable at 50 ft
-for (const y of [LIFT, LIFT+S]) for (const z of [-H,H]) beam(0,y,z, S+t,t,t, edgeMat, wire);
-for (const y of [LIFT, LIFT+S]) for (const x of [-H,H]) beam(x,y,0, t,t,S+t, edgeMat, wire);
-for (const x of [-H,H]) for (const z of [-H,H]) beam(x,LIFT+H,z, t,S,t, edgeMat, wire);
+for (const y of [LIFT, LIFT+S]) { beam(0,y,-H, S+t,t,t, edgeMat, wire); beam(H,y,0, t,t,S+t, edgeMat, wire); }
+for (const [x,z] of [[-H,-H],[H,-H],[H,H]]) beam(x,LIFT+H,z, t,S,t, edgeMat, wire);
 
-// Model 2: white box, open and recessed on the two faces that meet at the viewer-side corner (-Z and +X)
+// Model 2: white V-shaped block (arms D deep along the -Z and +X faces), each front face open and recessed. No back faces of the cube.
 const solid = new THREE.Group(); solid.visible = false; setup.add(solid);
 const white = new THREE.MeshStandardMaterial({ color:0xe2e2e2, emissive:0x1e1e1e, roughness:.95, metalness:0, side:THREE.DoubleSide });
 const F = S*0.06, D = S*0.30, CY = LIFT+H, IH = S-2*F; // frame width, recess depth, centre height, opening height
 function wall(w,h,x,y,z,ry=0,rx=0){ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),white); m.position.set(x,y,z); m.rotation.set(rx,ry,0); solid.add(m); }
-wall(S,S, 0,LIFT+S,0, 0,Math.PI/2);  wall(S,S, 0,LIFT,0, 0,Math.PI/2);        // outer top, underside
-wall(S,S, 0,CY,H);                   wall(S,S, -H,CY,0, Math.PI/2);          // closed back faces (+Z, -X)
-wall(S,S, 0,LIFT+S-F,0, 0,Math.PI/2); wall(S,S, 0,LIFT+F,0, 0,Math.PI/2);    // recess ceiling, floor
+const vShape = new THREE.Shape([[-H,-H],[H,-H],[H,H],[H-D,H],[H-D,-H+D],[-H,-H+D]].map(([x,z]) => new THREE.Vector2(x,z)));
+const vGeo = new THREE.ShapeGeometry(vShape);
+for (const y of [LIFT+S, LIFT, LIFT+S-F, LIFT+F]) {   // outer top, underside, recess ceiling, recess floor: all V-shaped in plan
+  const m = new THREE.Mesh(vGeo, white); m.rotation.x = Math.PI/2; m.position.y = y; solid.add(m);
+}
+wall(S-D,S, -D/2,CY,-H+D);  wall(S-D,S, H-D,CY,D/2, Math.PI/2);              // rear of each arm (also the back wall of its recess)
+wall(D,S, -H,CY,-H+D/2, Math.PI/2);  wall(D,S, H-D/2,CY,H);                  // closed ends of the two arms
 for (const y of [LIFT+F/2, LIFT+S-F/2]) { wall(S,F, 0,y,-H); wall(S,F, H,y,0, Math.PI/2); }   // frame top + bottom strips
 wall(F,IH, -H+F/2,CY,-H); wall(F,IH, H-F/2,CY,-H);                             // frame sides, -Z face
 wall(F,IH, H,CY,-H+F/2, Math.PI/2); wall(F,IH, H,CY,H-F/2, Math.PI/2);         // frame sides, +X face
-wall(S-D-F,IH, (F-D)/2,CY,-H+D);          wall(S-D-F,IH, H-D,CY,(D-F)/2, Math.PI/2); // recess back walls
 wall(D,IH, -H+F,CY,-H+D/2, Math.PI/2);    wall(D,IH, H-D/2,CY,H-F);                  // recess outer side walls
 wall(F,IH, H-F,CY,-H+F/2, Math.PI/2);     wall(F,IH, H-F/2,CY,-H+F);                 // inner sides of the corner post
 wall((D-F)*Math.SQRT2,IH, H-(F+D)/2,CY,-H+(F+D)/2, Math.PI/4);                       // divider between the two recesses, edge-on from the corner
 
-for (const z of [-H,H]) beam(0,0.01,z, S,0.02,0.08, footMat);   // footprint on ground
-for (const x of [-H,H]) beam(x,0.01,0, 0.08,0.02,S, footMat);
+beam(0,0.025,-H, S,0.02,0.08, footMat);   // screen lines on the ground, under the two faces
+beam(H,0.025,0, 0.08,0.02,S, footMat);
 
 // Floor marker: red 40 x 40 ft square covering the cube plus the DJ platform, shown first so it can be lined up with the ground
 const M = 40*FT, MO = 5*FT;   // size, and offset toward the DJ corner (+X,-Z) so the platform sits inside it
